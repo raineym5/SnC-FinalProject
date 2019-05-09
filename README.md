@@ -8,5 +8,5 @@ The ode is visible in /ATtiny13a
 The LaTeX report is visible in /Writeup  
 The thermistor charactersitics recorded by hand are visible in /therm.ods  
 
-If there are any questions, please contact me at raineym5@students.rowan.edu  
+If there are any questions, please contact me at my rowan email, I'm not going to post it here since this is public.  
 Thank you and 73  
