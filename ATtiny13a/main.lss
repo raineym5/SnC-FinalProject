@@ -1,0 +1,802 @@
+
+main.elf:     file format elf32-avr
+
+Sections:
+Idx Name          Size      VMA       LMA       File off  Algn
+  0 .text         000003e4  00000000  00000000  00000094  2**1
+                  CONTENTS, ALLOC, LOAD, READONLY, CODE
+  1 .data         00000004  00800060  000003e4  00000478  2**0
+                  CONTENTS, ALLOC, LOAD, DATA
+  2 .bss          0000000d  00800064  00800064  0000047c  2**0
+                  ALLOC
+  3 .stab         00000f30  00000000  00000000  0000047c  2**2
+                  CONTENTS, READONLY, DEBUGGING
+  4 .stabstr      00000f0c  00000000  00000000  000013ac  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  5 .comment      00000011  00000000  00000000  000022b8  2**0
+                  CONTENTS, READONLY
+  6 .note.gnu.avr.deviceinfo 0000003c  00000000  00000000  000022cc  2**2
+                  CONTENTS, READONLY
+  7 .debug_info   000002b8  00000000  00000000  00002308  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  8 .debug_abbrev 00000294  00000000  00000000  000025c0  2**0
+                  CONTENTS, READONLY, DEBUGGING
+  9 .debug_line   0000001a  00000000  00000000  00002854  2**0
+                  CONTENTS, READONLY, DEBUGGING
+ 10 .debug_str    000000f6  00000000  00000000  0000286e  2**0
+                  CONTENTS, READONLY, DEBUGGING
+
+Disassembly of section .text:
+
+00000000 <__vectors>:
+   0:	09 c0       	rjmp	.+18     	; 0x14 <__ctors_end>
+   2:	21 c0       	rjmp	.+66     	; 0x46 <__bad_interrupt>
+   4:	20 c0       	rjmp	.+64     	; 0x46 <__bad_interrupt>
+   6:	2a c1       	rjmp	.+596    	; 0x25c <__vector_3>
+   8:	1e c0       	rjmp	.+60     	; 0x46 <__bad_interrupt>
+   a:	1d c0       	rjmp	.+58     	; 0x46 <__bad_interrupt>
+   c:	1c c0       	rjmp	.+56     	; 0x46 <__bad_interrupt>
+   e:	1b c0       	rjmp	.+54     	; 0x46 <__bad_interrupt>
+  10:	1a c0       	rjmp	.+52     	; 0x46 <__bad_interrupt>
+  12:	81 c1       	rjmp	.+770    	; 0x316 <__vector_9>
+
+00000014 <__ctors_end>:
+  14:	11 24       	eor	r1, r1
+  16:	1f be       	out	0x3f, r1	; 63
+  18:	cf e9       	ldi	r28, 0x9F	; 159
+  1a:	cd bf       	out	0x3d, r28	; 61
+
+0000001c <__do_copy_data>:
+  1c:	10 e0       	ldi	r17, 0x00	; 0
+  1e:	a0 e6       	ldi	r26, 0x60	; 96
+  20:	b0 e0       	ldi	r27, 0x00	; 0
+  22:	e4 ee       	ldi	r30, 0xE4	; 228
+  24:	f3 e0       	ldi	r31, 0x03	; 3
+  26:	02 c0       	rjmp	.+4      	; 0x2c <__do_copy_data+0x10>
+  28:	05 90       	lpm	r0, Z+
+  2a:	0d 92       	st	X+, r0
+  2c:	a4 36       	cpi	r26, 0x64	; 100
+  2e:	b1 07       	cpc	r27, r17
+  30:	d9 f7       	brne	.-10     	; 0x28 <__do_copy_data+0xc>
+
+00000032 <__do_clear_bss>:
+  32:	20 e0       	ldi	r18, 0x00	; 0
+  34:	a4 e6       	ldi	r26, 0x64	; 100
+  36:	b0 e0       	ldi	r27, 0x00	; 0
+  38:	01 c0       	rjmp	.+2      	; 0x3c <.do_clear_bss_start>
+
+0000003a <.do_clear_bss_loop>:
+  3a:	1d 92       	st	X+, r1
+
+0000003c <.do_clear_bss_start>:
+  3c:	a1 37       	cpi	r26, 0x71	; 113
+  3e:	b2 07       	cpc	r27, r18
+  40:	e1 f7       	brne	.-8      	; 0x3a <.do_clear_bss_loop>
+  42:	76 d1       	rcall	.+748    	; 0x330 <main>
+  44:	cd c1       	rjmp	.+922    	; 0x3e0 <_exit>
+
+00000046 <__bad_interrupt>:
+  46:	dc cf       	rjmp	.-72     	; 0x0 <__vectors>
+
+00000048 <latch>:
+//PD	0.5*Kc	/		0.12Pd
+//PI	0.45Kc	0.85Pc	/
+//PID	0.65Kc	0.5Pc	0.12Pd	
+
+void latch(void){//function used in miltiplexing the 7seg display through the shift register
+	PORTB |= (1<<PB1);
+  48:	c1 9a       	sbi	0x18, 1	; 24
+	asm("nop");
+  4a:	00 00       	nop
+	PORTB &= ~(1<<PB1);
+  4c:	c1 98       	cbi	0x18, 1	; 24
+  4e:	08 95       	ret
+
+00000050 <Timer_Init>:
+}
+void Timer_Init(void){//
+	TCCR0A = (1<<COM0A1)|(1<<WGM01)|(1<<WGM00);//fast pwm on timer0
+  50:	83 e8       	ldi	r24, 0x83	; 131
+  52:	8f bd       	out	0x2f, r24	; 47
+	TCCR0B = (1<<CS01)|(1<<CS00);//585.9375
+  54:	83 e0       	ldi	r24, 0x03	; 3
+  56:	83 bf       	out	0x33, r24	; 51
+	OCR0A = 0;//Timer0 PWM value init
+  58:	16 be       	out	0x36, r1	; 54
+	TIMSK0 = (1<<TOIE0);//OVF EN
+  5a:	82 e0       	ldi	r24, 0x02	; 2
+  5c:	89 bf       	out	0x39, r24	; 57
+  5e:	08 95       	ret
+
+00000060 <IO_init>:
+	ADMUX = (1<<MUX0)|(1<<ADLAR);//ADC pin PB2
+	ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADIE);//ADC EN, ~125 KHz ADC, ADC INT EN
+	//ADCSRB = (1<<ADTS2);//manual interrupt
+}*/
+void IO_init(void){
+	DDRB = 0xFB;
+  60:	8b ef       	ldi	r24, 0xFB	; 251
+  62:	87 bb       	out	0x17, r24	; 23
+  64:	08 95       	ret
+
+00000066 <readADC_potentiometer>:
+}
+uint8_t readADC_potentiometer(void){
+	ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADIE);//ADC EN, ~125 KHz ADC, ADC INT EN
+  66:	8e e8       	ldi	r24, 0x8E	; 142
+  68:	86 b9       	out	0x06, r24	; 6
+	ADMUX = (1<<MUX0)|(1<<ADLAR);//ADC pin PB2
+  6a:	81 e2       	ldi	r24, 0x21	; 33
+  6c:	87 b9       	out	0x07, r24	; 7
+	ADCSRA |= (1<<ADSC);
+  6e:	36 9a       	sbi	0x06, 6	; 6
+	asm("SEI");//set up interrupts
+  70:	78 94       	sei
+	MCUCR = (1<<SE);//sleep 	enable
+  72:	80 e2       	ldi	r24, 0x20	; 32
+  74:	85 bf       	out	0x35, r24	; 53
+	asm("sleep");//sleep
+  76:	88 95       	sleep
+	ADCSRA = 0;
+  78:	16 b8       	out	0x06, r1	; 6
+	return ADCH;
+  7a:	85 b1       	in	r24, 0x05	; 5
+}
+  7c:	08 95       	ret
+
+0000007e <readADC_thermistor>:
+uint8_t readADC_thermistor(void){
+
+	ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADIE);//ADC EN, ~125 KHz ADC, ADC INT EN
+  7e:	8e e8       	ldi	r24, 0x8E	; 142
+  80:	86 b9       	out	0x06, r24	; 6
+	PORTB &= ~(1<<PB4);//no pullup
+  82:	c4 98       	cbi	0x18, 4	; 24
+	DDRB &= ~(1<<PB4);//input
+  84:	bc 98       	cbi	0x17, 4	; 23
+	ADMUX = (1<<MUX1)|(1<<ADLAR);//ADC pin PB2
+  86:	82 e2       	ldi	r24, 0x22	; 34
+  88:	87 b9       	out	0x07, r24	; 7
+	ADCSRA |= (1<<ADSC);
+  8a:	36 9a       	sbi	0x06, 6	; 6
+		
+	asm("SEI");//set up interrupts
+  8c:	78 94       	sei
+	MCUCR = (1<<SE);//sleep enable
+  8e:	80 e2       	ldi	r24, 0x20	; 32
+  90:	85 bf       	out	0x35, r24	; 53
+	asm("sleep");//sleep
+  92:	88 95       	sleep
+
+	DDRB |= (1<<PB4);
+  94:	bc 9a       	sbi	0x17, 4	; 23
+	ADCSRA = 0;
+  96:	16 b8       	out	0x06, r1	; 6
+	return ADCH;
+  98:	85 b1       	in	r24, 0x05	; 5
+}
+  9a:	08 95       	ret
+
+0000009c <send>:
+void send(uint8_t input){//transmit byte to the shift register
+  9c:	98 e0       	ldi	r25, 0x08	; 8
+	for(uint8_t i=0;i<8;i++){//run 8 times
+		if((input & 0x01)== 0x01)//if 1, set output to 1
+  9e:	80 ff       	sbrs	r24, 0
+  a0:	02 c0       	rjmp	.+4      	; 0xa6 <__stack+0x7>
+			PORTB |= (1<<PB4);//data set
+  a2:	c4 9a       	sbi	0x18, 4	; 24
+  a4:	01 c0       	rjmp	.+2      	; 0xa8 <__stack+0x9>
+		else
+			PORTB &= ~(1<<PB4);//else 0
+  a6:	c4 98       	cbi	0x18, 4	; 24
+		input = input>>1;//shift over 1
+  a8:	86 95       	lsr	r24
+		PORTB |= (1<<PB3);//turn on clock
+  aa:	c3 9a       	sbi	0x18, 3	; 24
+		PORTB &= ~(1<<PB3);//turn off clock
+  ac:	c3 98       	cbi	0x18, 3	; 24
+  ae:	91 50       	subi	r25, 0x01	; 1
+	DDRB |= (1<<PB4);
+	ADCSRA = 0;
+	return ADCH;
+}
+void send(uint8_t input){//transmit byte to the shift register
+	for(uint8_t i=0;i<8;i++){//run 8 times
+  b0:	b1 f7       	brne	.-20     	; 0x9e <send+0x2>
+			PORTB &= ~(1<<PB4);//else 0
+		input = input>>1;//shift over 1
+		PORTB |= (1<<PB3);//turn on clock
+		PORTB &= ~(1<<PB3);//turn off clock
+	}
+}	
+  b2:	08 95       	ret
+
+000000b4 <PID_Error_PWM>:
+
+
+uint8_t PID_Error_PWM(int8_t error[2]){
+  b4:	fc 01       	movw	r30, r24
+	uint16_t total;//made 16 bit so there's no overflows
+	
+	p =  kp*error[0];//P term
+  b6:	20 81       	ld	r18, Z
+  b8:	02 2e       	mov	r0, r18
+  ba:	00 0c       	add	r0, r0
+  bc:	33 0b       	sbc	r19, r19
+  be:	c9 01       	movw	r24, r18
+  c0:	88 0f       	add	r24, r24
+  c2:	99 1f       	adc	r25, r25
+  c4:	88 0f       	add	r24, r24
+  c6:	99 1f       	adc	r25, r25
+  c8:	28 0f       	add	r18, r24
+  ca:	39 1f       	adc	r19, r25
+  cc:	a9 01       	movw	r20, r18
+  ce:	44 0f       	add	r20, r20
+  d0:	55 1f       	adc	r21, r21
+  d2:	44 0f       	add	r20, r20
+  d4:	55 1f       	adc	r21, r21
+  d6:	24 0f       	add	r18, r20
+  d8:	35 1f       	adc	r19, r21
+  da:	22 0f       	add	r18, r18
+  dc:	33 1f       	adc	r19, r19
+  de:	c9 01       	movw	r24, r18
+  e0:	30 93 69 00 	sts	0x0069, r19	; 0x800069 <p+0x1>
+  e4:	20 93 68 00 	sts	0x0068, r18	; 0x800068 <p>
+	if(p >= 255)
+  e8:	2f 3f       	cpi	r18, 0xFF	; 255
+  ea:	31 05       	cpc	r19, r1
+  ec:	3c f0       	brlt	.+14     	; 0xfc <PID_Error_PWM+0x48>
+		p = 255;//no overflows or underflows
+  ee:	8f ef       	ldi	r24, 0xFF	; 255
+  f0:	90 e0       	ldi	r25, 0x00	; 0
+  f2:	90 93 69 00 	sts	0x0069, r25	; 0x800069 <p+0x1>
+  f6:	80 93 68 00 	sts	0x0068, r24	; 0x800068 <p>
+  fa:	06 c0       	rjmp	.+12     	; 0x108 <PID_Error_PWM+0x54>
+	if(p < 0)
+  fc:	99 23       	and	r25, r25
+  fe:	24 f4       	brge	.+8      	; 0x108 <PID_Error_PWM+0x54>
+		p=0;
+ 100:	10 92 69 00 	sts	0x0069, r1	; 0x800069 <p+0x1>
+ 104:	10 92 68 00 	sts	0x0068, r1	; 0x800068 <p>
+		
+	i = i + ki*error[0];//I term
+ 108:	20 81       	ld	r18, Z
+ 10a:	80 91 66 00 	lds	r24, 0x0066	; 0x800066 <i>
+ 10e:	90 91 67 00 	lds	r25, 0x0067	; 0x800067 <i+0x1>
+ 112:	82 0f       	add	r24, r18
+ 114:	91 1d       	adc	r25, r1
+ 116:	27 fd       	sbrc	r18, 7
+ 118:	9a 95       	dec	r25
+	if(i >= 200)
+ 11a:	88 3c       	cpi	r24, 0xC8	; 200
+ 11c:	91 05       	cpc	r25, r1
+ 11e:	3c f0       	brlt	.+14     	; 0x12e <PID_Error_PWM+0x7a>
+		i = 150;//no overflows or underflows
+ 120:	86 e9       	ldi	r24, 0x96	; 150
+ 122:	90 e0       	ldi	r25, 0x00	; 0
+ 124:	90 93 67 00 	sts	0x0067, r25	; 0x800067 <i+0x1>
+ 128:	80 93 66 00 	sts	0x0066, r24	; 0x800066 <i>
+ 12c:	0b c0       	rjmp	.+22     	; 0x144 <PID_Error_PWM+0x90>
+	else if(i < 0)
+ 12e:	99 23       	and	r25, r25
+ 130:	2c f0       	brlt	.+10     	; 0x13c <PID_Error_PWM+0x88>
+	if(p >= 255)
+		p = 255;//no overflows or underflows
+	if(p < 0)
+		p=0;
+		
+	i = i + ki*error[0];//I term
+ 132:	90 93 67 00 	sts	0x0067, r25	; 0x800067 <i+0x1>
+ 136:	80 93 66 00 	sts	0x0066, r24	; 0x800066 <i>
+ 13a:	04 c0       	rjmp	.+8      	; 0x144 <PID_Error_PWM+0x90>
+	if(i >= 200)
+		i = 150;//no overflows or underflows
+	else if(i < 0)
+		i=0;
+ 13c:	10 92 67 00 	sts	0x0067, r1	; 0x800067 <i+0x1>
+ 140:	10 92 66 00 	sts	0x0066, r1	; 0x800066 <i>
+		
+	d =  kd * (error[1]-error[0]);//d term
+ 144:	21 81       	ldd	r18, Z+1	; 0x01
+ 146:	02 2e       	mov	r0, r18
+ 148:	00 0c       	add	r0, r0
+ 14a:	33 0b       	sbc	r19, r19
+ 14c:	80 81       	ld	r24, Z
+ 14e:	a9 01       	movw	r20, r18
+ 150:	48 1b       	sub	r20, r24
+ 152:	51 09       	sbc	r21, r1
+ 154:	87 fd       	sbrc	r24, 7
+ 156:	53 95       	inc	r21
+ 158:	9a 01       	movw	r18, r20
+ 15a:	22 95       	swap	r18
+ 15c:	32 95       	swap	r19
+ 15e:	30 7f       	andi	r19, 0xF0	; 240
+ 160:	32 27       	eor	r19, r18
+ 162:	20 7f       	andi	r18, 0xF0	; 240
+ 164:	32 27       	eor	r19, r18
+ 166:	24 1b       	sub	r18, r20
+ 168:	35 0b       	sbc	r19, r21
+ 16a:	22 0f       	add	r18, r18
+ 16c:	33 1f       	adc	r19, r19
+ 16e:	30 93 65 00 	sts	0x0065, r19	; 0x800065 <__data_end+0x1>
+ 172:	20 93 64 00 	sts	0x0064, r18	; 0x800064 <__data_end>
+	if(p+i == 0)
+ 176:	40 91 68 00 	lds	r20, 0x0068	; 0x800068 <p>
+ 17a:	50 91 69 00 	lds	r21, 0x0069	; 0x800069 <p+0x1>
+ 17e:	80 91 66 00 	lds	r24, 0x0066	; 0x800066 <i>
+ 182:	90 91 67 00 	lds	r25, 0x0067	; 0x800067 <i+0x1>
+ 186:	84 0f       	add	r24, r20
+ 188:	95 1f       	adc	r25, r21
+ 18a:	00 97       	sbiw	r24, 0x00	; 0
+ 18c:	29 f4       	brne	.+10     	; 0x198 <PID_Error_PWM+0xe4>
+		d=0;
+ 18e:	10 92 65 00 	sts	0x0065, r1	; 0x800065 <__data_end+0x1>
+ 192:	10 92 64 00 	sts	0x0064, r1	; 0x800064 <__data_end>
+ 196:	08 95       	ret
+	total = p+i+d;
+ 198:	82 0f       	add	r24, r18
+ 19a:	93 1f       	adc	r25, r19
+	if(total >= 255)//no overflows
+ 19c:	8f 3f       	cpi	r24, 0xFF	; 255
+ 19e:	91 05       	cpc	r25, r1
+ 1a0:	08 f0       	brcs	.+2      	; 0x1a4 <PID_Error_PWM+0xf0>
+		return 255;
+ 1a2:	8f ef       	ldi	r24, 0xFF	; 255
+	return (uint8_t)total;//mask top 8 bits
+}
+ 1a4:	08 95       	ret
+
+000001a6 <numtodisp>:
+//1 = 0x60	6 = 0xBE
+//2 = 0xDA	7 = 0xE0
+//3 = 0xF2	8 = 0xFE
+//4 = 0x66	9 = 0xF6
+uint8_t numtodisp(uint8_t disp){
+	if(disp == 1)return 0x60;
+ 1a6:	81 30       	cpi	r24, 0x01	; 1
+ 1a8:	91 f0       	breq	.+36     	; 0x1ce <numtodisp+0x28>
+	else if(disp == 2)return 0xDA;
+ 1aa:	82 30       	cpi	r24, 0x02	; 2
+ 1ac:	91 f0       	breq	.+36     	; 0x1d2 <numtodisp+0x2c>
+	else if(disp == 3)return 0xF2;
+ 1ae:	83 30       	cpi	r24, 0x03	; 3
+ 1b0:	91 f0       	breq	.+36     	; 0x1d6 <numtodisp+0x30>
+	else if(disp == 4)return 0x66;
+ 1b2:	84 30       	cpi	r24, 0x04	; 4
+ 1b4:	91 f0       	breq	.+36     	; 0x1da <numtodisp+0x34>
+	else if(disp == 5)return 0xB6;
+ 1b6:	85 30       	cpi	r24, 0x05	; 5
+ 1b8:	91 f0       	breq	.+36     	; 0x1de <numtodisp+0x38>
+	else if(disp == 6)return 0xBE;
+ 1ba:	86 30       	cpi	r24, 0x06	; 6
+ 1bc:	91 f0       	breq	.+36     	; 0x1e2 <numtodisp+0x3c>
+	else if(disp == 7)return 0xE0;
+ 1be:	87 30       	cpi	r24, 0x07	; 7
+ 1c0:	91 f0       	breq	.+36     	; 0x1e6 <numtodisp+0x40>
+	else if(disp == 8)return 0xFE;
+ 1c2:	88 30       	cpi	r24, 0x08	; 8
+ 1c4:	91 f0       	breq	.+36     	; 0x1ea <numtodisp+0x44>
+	else if(disp == 9)return 0xF6;
+ 1c6:	89 30       	cpi	r24, 0x09	; 9
+ 1c8:	91 f0       	breq	.+36     	; 0x1ee <numtodisp+0x48>
+	return 0xFC;
+ 1ca:	8c ef       	ldi	r24, 0xFC	; 252
+ 1cc:	08 95       	ret
+//1 = 0x60	6 = 0xBE
+//2 = 0xDA	7 = 0xE0
+//3 = 0xF2	8 = 0xFE
+//4 = 0x66	9 = 0xF6
+uint8_t numtodisp(uint8_t disp){
+	if(disp == 1)return 0x60;
+ 1ce:	80 e6       	ldi	r24, 0x60	; 96
+ 1d0:	08 95       	ret
+	else if(disp == 2)return 0xDA;
+ 1d2:	8a ed       	ldi	r24, 0xDA	; 218
+ 1d4:	08 95       	ret
+	else if(disp == 3)return 0xF2;
+ 1d6:	82 ef       	ldi	r24, 0xF2	; 242
+ 1d8:	08 95       	ret
+	else if(disp == 4)return 0x66;
+ 1da:	86 e6       	ldi	r24, 0x66	; 102
+ 1dc:	08 95       	ret
+	else if(disp == 5)return 0xB6;
+ 1de:	86 eb       	ldi	r24, 0xB6	; 182
+ 1e0:	08 95       	ret
+	else if(disp == 6)return 0xBE;
+ 1e2:	8e eb       	ldi	r24, 0xBE	; 190
+ 1e4:	08 95       	ret
+	else if(disp == 7)return 0xE0;
+ 1e6:	80 ee       	ldi	r24, 0xE0	; 224
+ 1e8:	08 95       	ret
+	else if(disp == 8)return 0xFE;
+ 1ea:	8e ef       	ldi	r24, 0xFE	; 254
+ 1ec:	08 95       	ret
+	else if(disp == 9)return 0xF6;
+ 1ee:	86 ef       	ldi	r24, 0xF6	; 246
+	return 0xFC;
+}
+ 1f0:	08 95       	ret
+
+000001f2 <temp_to_disp>:
+void temp_to_disp(uint8_t temp,uint8_t bit){//bit=0,2
+ 1f2:	0f 93       	push	r16
+ 1f4:	1f 93       	push	r17
+ 1f6:	cf 93       	push	r28
+ 1f8:	c8 2f       	mov	r28, r24
+	
+	uint8_t counter = 0;
+	while(temp >= 10){
+ 1fa:	8a 30       	cpi	r24, 0x0A	; 10
+ 1fc:	30 f0       	brcs	.+12     	; 0x20a <temp_to_disp+0x18>
+ 1fe:	80 e0       	ldi	r24, 0x00	; 0
+		counter++;
+ 200:	8f 5f       	subi	r24, 0xFF	; 255
+		temp-=10;
+ 202:	ca 50       	subi	r28, 0x0A	; 10
+	return 0xFC;
+}
+void temp_to_disp(uint8_t temp,uint8_t bit){//bit=0,2
+	
+	uint8_t counter = 0;
+	while(temp >= 10){
+ 204:	ca 30       	cpi	r28, 0x0A	; 10
+ 206:	e0 f7       	brcc	.-8      	; 0x200 <temp_to_disp+0xe>
+ 208:	01 c0       	rjmp	.+2      	; 0x20c <temp_to_disp+0x1a>
+	else if(disp == 9)return 0xF6;
+	return 0xFC;
+}
+void temp_to_disp(uint8_t temp,uint8_t bit){//bit=0,2
+	
+	uint8_t counter = 0;
+ 20a:	80 e0       	ldi	r24, 0x00	; 0
+	while(temp >= 10){
+		counter++;
+		temp-=10;
+	}		
+	receivedchars[bit] = numtodisp(counter);
+ 20c:	06 2f       	mov	r16, r22
+ 20e:	10 e0       	ldi	r17, 0x00	; 0
+ 210:	ca df       	rcall	.-108    	; 0x1a6 <numtodisp>
+ 212:	06 59       	subi	r16, 0x96	; 150
+ 214:	1f 4f       	sbci	r17, 0xFF	; 255
+ 216:	f8 01       	movw	r30, r16
+ 218:	80 83       	st	Z, r24
+	receivedchars[bit+1] = numtodisp(temp);
+ 21a:	8c 2f       	mov	r24, r28
+ 21c:	c4 df       	rcall	.-120    	; 0x1a6 <numtodisp>
+ 21e:	f8 01       	movw	r30, r16
+ 220:	81 83       	std	Z+1, r24	; 0x01
+	
+
+}
+ 222:	cf 91       	pop	r28
+ 224:	1f 91       	pop	r17
+ 226:	0f 91       	pop	r16
+ 228:	08 95       	ret
+
+0000022a <ADCtoTEMP>:
+
+
+uint8_t ADCtoTEMP(uint8_t ADCval){
+		return (uint8_t)(((uint16_t)105*ADCval)/256 - 17);//19 at end//let the comiler decide on whether to shift, swap nibbles, or something crazy, etc. 105/256 was picked because 0.41 is needed, and division should be base 2
+ 22a:	28 2f       	mov	r18, r24
+ 22c:	30 e0       	ldi	r19, 0x00	; 0
+ 22e:	c9 01       	movw	r24, r18
+ 230:	88 0f       	add	r24, r24
+ 232:	99 1f       	adc	r25, r25
+ 234:	88 0f       	add	r24, r24
+ 236:	99 1f       	adc	r25, r25
+ 238:	88 0f       	add	r24, r24
+ 23a:	99 1f       	adc	r25, r25
+ 23c:	82 1b       	sub	r24, r18
+ 23e:	93 0b       	sbc	r25, r19
+ 240:	9c 01       	movw	r18, r24
+ 242:	22 95       	swap	r18
+ 244:	32 95       	swap	r19
+ 246:	30 7f       	andi	r19, 0xF0	; 240
+ 248:	32 27       	eor	r19, r18
+ 24a:	20 7f       	andi	r18, 0xF0	; 240
+ 24c:	32 27       	eor	r19, r18
+ 24e:	a9 01       	movw	r20, r18
+ 250:	48 1b       	sub	r20, r24
+ 252:	59 0b       	sbc	r21, r25
+ 254:	ca 01       	movw	r24, r20
+}
+ 256:	8f ee       	ldi	r24, 0xEF	; 239
+ 258:	89 0f       	add	r24, r25
+ 25a:	08 95       	ret
+
+0000025c <__vector_3>:
+ISR(TIM0_OVF_vect){//585.9375 hz
+ 25c:	1f 92       	push	r1
+ 25e:	0f 92       	push	r0
+ 260:	0f b6       	in	r0, 0x3f	; 63
+ 262:	0f 92       	push	r0
+ 264:	11 24       	eor	r1, r1
+ 266:	2f 93       	push	r18
+ 268:	3f 93       	push	r19
+ 26a:	4f 93       	push	r20
+ 26c:	5f 93       	push	r21
+ 26e:	6f 93       	push	r22
+ 270:	7f 93       	push	r23
+ 272:	8f 93       	push	r24
+ 274:	9f 93       	push	r25
+ 276:	af 93       	push	r26
+ 278:	bf 93       	push	r27
+ 27a:	ef 93       	push	r30
+ 27c:	ff 93       	push	r31
+	if(ovf_counter >= 117){//5 hz
+ 27e:	80 91 70 00 	lds	r24, 0x0070	; 0x800070 <ovf_counter>
+ 282:	85 37       	cpi	r24, 0x75	; 117
+ 284:	30 f0       	brcs	.+12     	; 0x292 <__vector_3+0x36>
+		ovf_flag = 1;
+ 286:	81 e0       	ldi	r24, 0x01	; 1
+ 288:	80 93 6f 00 	sts	0x006F, r24	; 0x80006f <ovf_flag>
+		ovf_counter = 0;
+ 28c:	10 92 70 00 	sts	0x0070, r1	; 0x800070 <ovf_counter>
+ 290:	03 c0       	rjmp	.+6      	; 0x298 <__vector_3+0x3c>
+	}else
+		ovf_counter++;
+ 292:	8f 5f       	subi	r24, 0xFF	; 255
+ 294:	80 93 70 00 	sts	0x0070, r24	; 0x800070 <ovf_counter>
+	if(sregctr == 0x80){//fancy thing done here, sregctr is the second thing sent. It acts as the cathode on the 7seg, and is also used for deciding which digit is sent
+ 298:	80 91 6e 00 	lds	r24, 0x006E	; 0x80006e <sregctr>
+ 29c:	80 38       	cpi	r24, 0x80	; 128
+ 29e:	21 f4       	brne	.+8      	; 0x2a8 <__vector_3+0x4c>
+		send( receivedchars[2]);
+ 2a0:	80 91 6c 00 	lds	r24, 0x006C	; 0x80006c <receivedchars+0x2>
+ 2a4:	fb de       	rcall	.-522    	; 0x9c <send>
+ 2a6:	15 c0       	rjmp	.+42     	; 0x2d2 <__vector_3+0x76>
+	}else if(sregctr == 0x40){
+ 2a8:	80 34       	cpi	r24, 0x40	; 64
+ 2aa:	21 f4       	brne	.+8      	; 0x2b4 <__vector_3+0x58>
+		send( receivedchars[3]);
+ 2ac:	80 91 6d 00 	lds	r24, 0x006D	; 0x80006d <receivedchars+0x3>
+ 2b0:	f5 de       	rcall	.-534    	; 0x9c <send>
+ 2b2:	0f c0       	rjmp	.+30     	; 0x2d2 <__vector_3+0x76>
+	}else if(sregctr == 0x20){
+ 2b4:	80 32       	cpi	r24, 0x20	; 32
+ 2b6:	21 f4       	brne	.+8      	; 0x2c0 <__vector_3+0x64>
+		send( receivedchars[0]);
+ 2b8:	80 91 6a 00 	lds	r24, 0x006A	; 0x80006a <receivedchars>
+ 2bc:	ef de       	rcall	.-546    	; 0x9c <send>
+ 2be:	09 c0       	rjmp	.+18     	; 0x2d2 <__vector_3+0x76>
+	}else if(sregctr == 0x10){
+ 2c0:	80 31       	cpi	r24, 0x10	; 16
+ 2c2:	21 f4       	brne	.+8      	; 0x2cc <__vector_3+0x70>
+		send( receivedchars[1]);
+ 2c4:	80 91 6b 00 	lds	r24, 0x006B	; 0x80006b <receivedchars+0x1>
+ 2c8:	e9 de       	rcall	.-558    	; 0x9c <send>
+ 2ca:	03 c0       	rjmp	.+6      	; 0x2d2 <__vector_3+0x76>
+	}else
+		sregctr = 0x08;
+ 2cc:	88 e0       	ldi	r24, 0x08	; 8
+ 2ce:	80 93 6e 00 	sts	0x006E, r24	; 0x80006e <sregctr>
+	send(~sregctr);//send the inverse of sregctr
+ 2d2:	80 91 6e 00 	lds	r24, 0x006E	; 0x80006e <sregctr>
+ 2d6:	80 95       	com	r24
+ 2d8:	e1 de       	rcall	.-574    	; 0x9c <send>
+	latch();//latch the shift register, displaying the values.
+ 2da:	b6 de       	rcall	.-660    	; 0x48 <latch>
+	if(sregctr == 0x80)//if it is on the 4th digit, set it as just before the 1st digit
+ 2dc:	80 91 6e 00 	lds	r24, 0x006E	; 0x80006e <sregctr>
+ 2e0:	80 38       	cpi	r24, 0x80	; 128
+ 2e2:	19 f4       	brne	.+6      	; 0x2ea <__vector_3+0x8e>
+		sregctr = 0x08;
+ 2e4:	88 e0       	ldi	r24, 0x08	; 8
+ 2e6:	80 93 6e 00 	sts	0x006E, r24	; 0x80006e <sregctr>
+
+		sregctr = sregctr<<1;//shift over sregctr
+ 2ea:	80 91 6e 00 	lds	r24, 0x006E	; 0x80006e <sregctr>
+ 2ee:	88 0f       	add	r24, r24
+ 2f0:	80 93 6e 00 	sts	0x006E, r24	; 0x80006e <sregctr>
+}
+ 2f4:	ff 91       	pop	r31
+ 2f6:	ef 91       	pop	r30
+ 2f8:	bf 91       	pop	r27
+ 2fa:	af 91       	pop	r26
+ 2fc:	9f 91       	pop	r25
+ 2fe:	8f 91       	pop	r24
+ 300:	7f 91       	pop	r23
+ 302:	6f 91       	pop	r22
+ 304:	5f 91       	pop	r21
+ 306:	4f 91       	pop	r20
+ 308:	3f 91       	pop	r19
+ 30a:	2f 91       	pop	r18
+ 30c:	0f 90       	pop	r0
+ 30e:	0f be       	out	0x3f, r0	; 63
+ 310:	0f 90       	pop	r0
+ 312:	1f 90       	pop	r1
+ 314:	18 95       	reti
+
+00000316 <__vector_9>:
+
+ISR(ADC_vect){}
+ 316:	1f 92       	push	r1
+ 318:	0f 92       	push	r0
+ 31a:	0f b6       	in	r0, 0x3f	; 63
+ 31c:	0f 92       	push	r0
+ 31e:	11 24       	eor	r1, r1
+ 320:	0f 90       	pop	r0
+ 322:	0f be       	out	0x3f, r0	; 63
+ 324:	0f 90       	pop	r0
+ 326:	1f 90       	pop	r1
+ 328:	18 95       	reti
+
+0000032a <PottoTemp>:
+uint8_t PottoTemp(uint8_t pot){
+	return pot>>2;//0 to 65c, quite linear
+}
+ 32a:	86 95       	lsr	r24
+ 32c:	86 95       	lsr	r24
+ 32e:	08 95       	ret
+
+00000330 <main>:
+
+
+
+int main(void){
+ 330:	cf 93       	push	r28
+ 332:	df 93       	push	r29
+ 334:	00 d0       	rcall	.+0      	; 0x336 <main+0x6>
+ 336:	cd b7       	in	r28, 0x3d	; 61
+ 338:	dd 27       	eor	r29, r29
+
+	DDRB = 0xFF;
+ 33a:	8f ef       	ldi	r24, 0xFF	; 255
+ 33c:	87 bb       	out	0x17, r24	; 23
+
+	Timer_Init();//init timer
+ 33e:	88 de       	rcall	.-752    	; 0x50 <Timer_Init>
+	ADMUX = (1<<MUX0)|(1<<ADLAR);//ADC pin PB2
+	ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADIE);//ADC EN, ~125 KHz ADC, ADC INT EN
+	//ADCSRB = (1<<ADTS2);//manual interrupt
+}*/
+void IO_init(void){
+	DDRB = 0xFB;
+ 340:	8b ef       	ldi	r24, 0xFB	; 251
+ 342:	87 bb       	out	0x17, r24	; 23
+
+	Timer_Init();//init timer
+
+	IO_init();
+	uint8_t realTemp[]={0,0},goalTemp_filtered = 0,realTemp_ADC = 0,goalTemp_ADC = 0,goalTemp[] = {0,0},realTemp_filtered=0;
+	int8_t error[] = {0,0};
+ 344:	19 82       	std	Y+1, r1	; 0x01
+ 346:	1a 82       	std	Y+2, r1	; 0x02
+	DDRB = 0xFF;
+
+	Timer_Init();//init timer
+
+	IO_init();
+	uint8_t realTemp[]={0,0},goalTemp_filtered = 0,realTemp_ADC = 0,goalTemp_ADC = 0,goalTemp[] = {0,0},realTemp_filtered=0;
+ 348:	10 e0       	ldi	r17, 0x00	; 0
+ 34a:	b1 2c       	mov	r11, r1
+	int8_t error[] = {0,0};
+	while(1){
+		asm("SEI");//set up interrupts
+		MCUCR = (1<<SE);//sleep enable
+ 34c:	68 94       	set
+ 34e:	cc 24       	eor	r12, r12
+ 350:	c5 f8       	bld	r12, 5
+ 352:	02 c0       	rjmp	.+4      	; 0x358 <main+0x28>
+ 354:	ba 2c       	mov	r11, r10
+ 356:	1d 2d       	mov	r17, r13
+
+	IO_init();
+	uint8_t realTemp[]={0,0},goalTemp_filtered = 0,realTemp_ADC = 0,goalTemp_ADC = 0,goalTemp[] = {0,0},realTemp_filtered=0;
+	int8_t error[] = {0,0};
+	while(1){
+		asm("SEI");//set up interrupts
+ 358:	78 94       	sei
+		MCUCR = (1<<SE);//sleep enable
+ 35a:	c5 be       	out	0x35, r12	; 53
+		asm("sleep");//sleep
+ 35c:	88 95       	sleep
+		
+		goalTemp_ADC = readADC_potentiometer();
+ 35e:	83 de       	rcall	.-762    	; 0x66 <readADC_potentiometer>
+ 360:	d8 2e       	mov	r13, r24
+		realTemp_ADC = readADC_thermistor();
+ 362:	8d de       	rcall	.-742    	; 0x7e <readADC_thermistor>
+		sregctr = sregctr<<1;//shift over sregctr
+}
+
+ISR(ADC_vect){}
+uint8_t PottoTemp(uint8_t pot){
+	return pot>>2;//0 to 65c, quite linear
+ 364:	d6 94       	lsr	r13
+ 366:	d6 94       	lsr	r13
+		
+		goalTemp_ADC = readADC_potentiometer();
+		realTemp_ADC = readADC_thermistor();
+		goalTemp[0] = goalTemp[1];
+		goalTemp[1] = PottoTemp(goalTemp_ADC);
+		goalTemp_filtered = (goalTemp[0] + goalTemp[1])>>1; 
+ 368:	ed 2c       	mov	r14, r13
+ 36a:	f1 2c       	mov	r15, r1
+ 36c:	e1 0e       	add	r14, r17
+ 36e:	f1 1c       	adc	r15, r1
+ 370:	f5 94       	asr	r15
+ 372:	e7 94       	ror	r14
+
+}
+
+
+uint8_t ADCtoTEMP(uint8_t ADCval){
+		return (uint8_t)(((uint16_t)105*ADCval)/256 - 17);//19 at end//let the comiler decide on whether to shift, swap nibbles, or something crazy, etc. 105/256 was picked because 0.41 is needed, and division should be base 2
+ 374:	28 2f       	mov	r18, r24
+ 376:	30 e0       	ldi	r19, 0x00	; 0
+ 378:	c9 01       	movw	r24, r18
+ 37a:	88 0f       	add	r24, r24
+ 37c:	99 1f       	adc	r25, r25
+ 37e:	88 0f       	add	r24, r24
+ 380:	99 1f       	adc	r25, r25
+ 382:	88 0f       	add	r24, r24
+ 384:	99 1f       	adc	r25, r25
+ 386:	82 1b       	sub	r24, r18
+ 388:	93 0b       	sbc	r25, r19
+ 38a:	9c 01       	movw	r18, r24
+ 38c:	22 95       	swap	r18
+ 38e:	32 95       	swap	r19
+ 390:	30 7f       	andi	r19, 0xF0	; 240
+ 392:	32 27       	eor	r19, r18
+ 394:	20 7f       	andi	r18, 0xF0	; 240
+ 396:	32 27       	eor	r19, r18
+ 398:	a9 01       	movw	r20, r18
+ 39a:	48 1b       	sub	r20, r24
+ 39c:	59 0b       	sbc	r21, r25
+ 39e:	ca 01       	movw	r24, r20
+ 3a0:	0f 2e       	mov	r0, r31
+ 3a2:	ff ee       	ldi	r31, 0xEF	; 239
+ 3a4:	af 2e       	mov	r10, r31
+ 3a6:	f0 2d       	mov	r31, r0
+ 3a8:	a9 0e       	add	r10, r25
+		goalTemp[1] = PottoTemp(goalTemp_ADC);
+		goalTemp_filtered = (goalTemp[0] + goalTemp[1])>>1; 
+		
+		realTemp[0] = realTemp[1];
+		realTemp[1] = ADCtoTEMP(realTemp_ADC);//convert to temperature
+		realTemp_filtered = (realTemp[0] + realTemp[1])>>1; 
+ 3aa:	0a 2d       	mov	r16, r10
+ 3ac:	10 e0       	ldi	r17, 0x00	; 0
+ 3ae:	0b 0d       	add	r16, r11
+ 3b0:	11 1d       	adc	r17, r1
+ 3b2:	15 95       	asr	r17
+ 3b4:	07 95       	ror	r16
+		temp_to_disp(goalTemp_filtered,0);
+ 3b6:	60 e0       	ldi	r22, 0x00	; 0
+ 3b8:	8e 2d       	mov	r24, r14
+ 3ba:	1b df       	rcall	.-458    	; 0x1f2 <temp_to_disp>
+		temp_to_disp(realTemp_filtered,2);
+ 3bc:	62 e0       	ldi	r22, 0x02	; 2
+ 3be:	80 2f       	mov	r24, r16
+ 3c0:	18 df       	rcall	.-464    	; 0x1f2 <temp_to_disp>
+		
+		if(ovf_flag){
+ 3c2:	80 91 6f 00 	lds	r24, 0x006F	; 0x80006f <ovf_flag>
+ 3c6:	88 23       	and	r24, r24
+ 3c8:	29 f2       	breq	.-118    	; 0x354 <main+0x24>
+		ovf_flag=0;
+ 3ca:	10 92 6f 00 	sts	0x006F, r1	; 0x80006f <ovf_flag>
+		
+		error[0] = realTemp_filtered - goalTemp_filtered;//save error
+ 3ce:	0e 19       	sub	r16, r14
+ 3d0:	09 83       	std	Y+1, r16	; 0x01
+		OCR0A = PID_Error_PWM(error);//convert to PWM value using PID
+ 3d2:	ce 01       	movw	r24, r28
+ 3d4:	01 96       	adiw	r24, 0x01	; 1
+ 3d6:	6e de       	rcall	.-804    	; 0xb4 <PID_Error_PWM>
+ 3d8:	86 bf       	out	0x36, r24	; 54
+		
+		error[1] = error[0];
+ 3da:	89 81       	ldd	r24, Y+1	; 0x01
+ 3dc:	8a 83       	std	Y+2, r24	; 0x02
+ 3de:	ba cf       	rjmp	.-140    	; 0x354 <main+0x24>
+
+000003e0 <_exit>:
+ 3e0:	f8 94       	cli
+
+000003e2 <__stop_program>:
+ 3e2:	ff cf       	rjmp	.-2      	; 0x3e2 <__stop_program>

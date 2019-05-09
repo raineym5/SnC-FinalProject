@@ -1,0 +1,29 @@
+\BOOKMARK [1][-]{section.1}{Design Overview}{}% 1
+\BOOKMARK [2][-]{subsection.1.1}{Design Features}{section.1}% 2
+\BOOKMARK [2][-]{subsection.1.2}{Featured Applications}{section.1}% 3
+\BOOKMARK [2][-]{subsection.1.3}{Design Resources}{section.1}% 4
+\BOOKMARK [2][-]{subsection.1.4}{Board Image}{section.1}% 5
+\BOOKMARK [1][-]{section.2}{Key System Specifications}{}% 6
+\BOOKMARK [1][-]{section.3}{System Description}{}% 7
+\BOOKMARK [2][-]{subsection.3.1}{Detailed Block Diagram}{section.3}% 8
+\BOOKMARK [2][-]{subsection.3.2}{Highlighted Devices}{section.3}% 9
+\BOOKMARK [2][-]{subsection.3.3}{Attiny13a-pu}{section.3}% 10
+\BOOKMARK [2][-]{subsection.3.4}{Thermistor}{section.3}% 11
+\BOOKMARK [2][-]{subsection.3.5}{2N7000}{section.3}% 12
+\BOOKMARK [1][-]{section.4}{SYSTEM DESIGN THEORY}{}% 13
+\BOOKMARK [2][-]{subsection.4.1}{Design Requirement 1}{section.4}% 14
+\BOOKMARK [1][-]{section.5}{Code Review}{}% 15
+\BOOKMARK [2][-]{subsection.5.1}{Initialization}{section.5}% 16
+\BOOKMARK [2][-]{subsection.5.2}{Sensor Acquisition}{section.5}% 17
+\BOOKMARK [3][-]{subsubsection.5.2.1}{Signal Conditioning}{subsection.5.2}% 18
+\BOOKMARK [2][-]{subsection.5.3}{Error Calculation}{section.5}% 19
+\BOOKMARK [2][-]{subsection.5.4}{Control Calculation}{section.5}% 20
+\BOOKMARK [2][-]{subsection.5.5}{display}{section.5}% 21
+\BOOKMARK [2][-]{subsection.5.6}{Matlab}{section.5}% 22
+\BOOKMARK [2][-]{subsection.5.7}{filter}{section.5}% 23
+\BOOKMARK [2][-]{subsection.5.8}{Actuation}{section.5}% 24
+\BOOKMARK [1][-]{section.6}{Design Files}{}% 25
+\BOOKMARK [2][-]{subsection.6.1}{Schematics}{section.6}% 26
+\BOOKMARK [2][-]{subsection.6.2}{Bill of Materials}{section.6}% 27
+\BOOKMARK [2][-]{subsection.6.3}{Diptrace Project}{section.6}% 28
+\BOOKMARK [2][-]{subsection.6.4}{Code}{section.6}% 29

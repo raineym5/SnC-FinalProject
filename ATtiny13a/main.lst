@@ -1,0 +1,1107 @@
+   1               		.file	"main.c"
+   2               	__SP_L__ = 0x3d
+   3               	__SREG__ = 0x3f
+   4               	__tmp_reg__ = 0
+   5               	__zero_reg__ = 1
+   8               		.text
+   9               	.Ltext0:
+ 106               	.global	latch
+ 108               	latch:
+ 109               		.stabd	46,0,0
+   1:main.c        **** 
+   2:main.c        **** #define F_CPU 8000000UL // Clock Speed#include <avr/io.h>
+   3:main.c        **** #include <stdint.h>
+   4:main.c        **** #include <avr/interrupt.h>
+   5:main.c        **** //PB5 - RESET
+   6:main.c        **** //PB3 - SCK
+   7:main.c        **** //PB4 - DO - Thermistor
+   8:main.c        **** //GND
+   9:main.c        **** 
+  10:main.c        **** 
+  11:main.c        **** //VCC
+  12:main.c        **** //PB2 - potentiometer
+  13:main.c        **** //PB1 - LATCH
+  14:main.c        **** //PB0 - Fan
+  15:main.c        **** 
+  16:main.c        **** //#define BAUD 9600
+  17:main.c        **** //#define MYUBRR F_CPU/16/BAUD-1
+  18:main.c        **** //PC1 - Thermistor
+  19:main.c        **** //PD6 - PWM
+  20:main.c        **** 
+  21:main.c        **** /*void USART_Init( unsigned int ubrr){
+  22:main.c        **** 	UBRR0H = (unsigned char)(ubrr>>8);
+  23:main.c        **** 	UBRR0L = (unsigned char)ubrr;//setup usart bits
+  24:main.c        **** 	UCSR0B = (1<<RXEN0)|(1<<TXEN0)|(1<<RXCIE0);//tx Rx enable, RX interrupt enable
+  25:main.c        **** }*/
+  26:main.c        **** uint8_t REF = 30,ovf_counter=0,ovf_flag=0,sregctr=0;
+  27:main.c        **** uint8_t receivedchars[] = {0,0,0,0};//Pc = 60
+  28:main.c        **** const uint8_t 	kp 	= 50,//kc = 3.5
+  29:main.c        **** 				ki 	= 1,
+  30:main.c        **** 				kd 	= 30;
+  31:main.c        **** int16_t p=0,i=0,d=0;//Several methods for tuning the PID loop exist. The choice of method will depe
+  32:main.c        **** //Kc = critical gain
+  33:main.c        **** //Pc = oscillation period (~10s)
+  34:main.c        **** //		Kp		Ti		Td
+  35:main.c        **** //P		0.5*Kc	/		/
+  36:main.c        **** //PD	0.5*Kc	/		0.12Pd
+  37:main.c        **** //PI	0.45Kc	0.85Pc	/
+  38:main.c        **** //PID	0.65Kc	0.5Pc	0.12Pd	
+  39:main.c        **** 
+  40:main.c        **** void latch(void){//function used in miltiplexing the 7seg display through the shift register
+ 111               	.LM0:
+ 112               	.LFBB1:
+ 113               	/* prologue: function */
+ 114               	/* frame size = 0 */
+ 115               	/* stack size = 0 */
+ 116               	.L__stack_usage = 0
+  41:main.c        **** 	PORTB |= (1<<PB1);
+ 118               	.LM1:
+ 119 0000 C19A      		sbi 0x18,1
+  42:main.c        **** 	asm("nop");
+ 121               	.LM2:
+ 122               	/* #APP */
+ 123               	 ;  42 "main.c" 1
+ 124 0002 0000      		nop
+ 125               	 ;  0 "" 2
+  43:main.c        **** 	PORTB &= ~(1<<PB1);
+ 127               	.LM3:
+ 128               	/* #NOAPP */
+ 129 0004 C198      		cbi 0x18,1
+ 130 0006 0895      		ret
+ 132               	.Lscope1:
+ 134               		.stabd	78,0,0
+ 136               	.global	Timer_Init
+ 138               	Timer_Init:
+ 139               		.stabd	46,0,0
+  44:main.c        **** }
+  45:main.c        **** void Timer_Init(void){//
+ 141               	.LM4:
+ 142               	.LFBB2:
+ 143               	/* prologue: function */
+ 144               	/* frame size = 0 */
+ 145               	/* stack size = 0 */
+ 146               	.L__stack_usage = 0
+  46:main.c        **** 	TCCR0A = (1<<COM0A1)|(1<<WGM01)|(1<<WGM00);//fast pwm on timer0
+ 148               	.LM5:
+ 149 0008 83E8      		ldi r24,lo8(-125)
+ 150 000a 8FBD      		out 0x2f,r24
+  47:main.c        **** 	TCCR0B = (1<<CS01)|(1<<CS00);//585.9375
+ 152               	.LM6:
+ 153 000c 83E0      		ldi r24,lo8(3)
+ 154 000e 83BF      		out 0x33,r24
+  48:main.c        **** 	OCR0A = 0;//Timer0 PWM value init
+ 156               	.LM7:
+ 157 0010 16BE      		out 0x36,__zero_reg__
+  49:main.c        **** 	TIMSK0 = (1<<TOIE0);//OVF EN
+ 159               	.LM8:
+ 160 0012 82E0      		ldi r24,lo8(2)
+ 161 0014 89BF      		out 0x39,r24
+ 162 0016 0895      		ret
+ 164               	.Lscope2:
+ 166               		.stabd	78,0,0
+ 168               	.global	IO_init
+ 170               	IO_init:
+ 171               		.stabd	46,0,0
+  50:main.c        **** 
+  51:main.c        **** 	//TCCR1B = (1<<CS11)|(1<<CS12)|(1<<CS13); //timer 1 clockdiv 
+  52:main.c        **** 	//OCR1A = (1<<7)|(1<<6);//timer 1 overflow rate high byte
+  53:main.c        **** 	//TIMSK |= (1<<OCIE1A);//timer 1 interrupt enable
+  54:main.c        **** 	
+  55:main.c        **** }/*
+  56:main.c        **** void ADC_init(void){//
+  57:main.c        **** 	ADMUX = (1<<MUX0)|(1<<ADLAR);//ADC pin PB2
+  58:main.c        **** 	ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADIE);//ADC EN, ~125 KHz ADC, ADC INT EN
+  59:main.c        **** 	//ADCSRB = (1<<ADTS2);//manual interrupt
+  60:main.c        **** }*/
+  61:main.c        **** void IO_init(void){
+ 173               	.LM9:
+ 174               	.LFBB3:
+ 175               	/* prologue: function */
+ 176               	/* frame size = 0 */
+ 177               	/* stack size = 0 */
+ 178               	.L__stack_usage = 0
+  62:main.c        **** 	DDRB = 0xFB;
+ 180               	.LM10:
+ 181 0018 8BEF      		ldi r24,lo8(-5)
+ 182 001a 87BB      		out 0x17,r24
+ 183 001c 0895      		ret
+ 185               	.Lscope3:
+ 187               		.stabd	78,0,0
+ 189               	.global	readADC_potentiometer
+ 191               	readADC_potentiometer:
+ 192               		.stabd	46,0,0
+  63:main.c        **** }
+  64:main.c        **** uint8_t readADC_potentiometer(void){
+ 194               	.LM11:
+ 195               	.LFBB4:
+ 196               	/* prologue: function */
+ 197               	/* frame size = 0 */
+ 198               	/* stack size = 0 */
+ 199               	.L__stack_usage = 0
+  65:main.c        **** 	ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADIE);//ADC EN, ~125 KHz ADC, ADC INT EN
+ 201               	.LM12:
+ 202 001e 8EE8      		ldi r24,lo8(-114)
+ 203 0020 86B9      		out 0x6,r24
+  66:main.c        **** 	ADMUX = (1<<MUX0)|(1<<ADLAR);//ADC pin PB2
+ 205               	.LM13:
+ 206 0022 81E2      		ldi r24,lo8(33)
+ 207 0024 87B9      		out 0x7,r24
+  67:main.c        **** 	ADCSRA |= (1<<ADSC);
+ 209               	.LM14:
+ 210 0026 369A      		sbi 0x6,6
+  68:main.c        **** 	asm("SEI");//set up interrupts
+ 212               	.LM15:
+ 213               	/* #APP */
+ 214               	 ;  68 "main.c" 1
+ 215 0028 7894      		SEI
+ 216               	 ;  0 "" 2
+  69:main.c        **** 	MCUCR = (1<<SE);//sleep 	enable
+ 218               	.LM16:
+ 219               	/* #NOAPP */
+ 220 002a 80E2      		ldi r24,lo8(32)
+ 221 002c 85BF      		out 0x35,r24
+  70:main.c        **** 	asm("sleep");//sleep
+ 223               	.LM17:
+ 224               	/* #APP */
+ 225               	 ;  70 "main.c" 1
+ 226 002e 8895      		sleep
+ 227               	 ;  0 "" 2
+  71:main.c        **** 	ADCSRA = 0;
+ 229               	.LM18:
+ 230               	/* #NOAPP */
+ 231 0030 16B8      		out 0x6,__zero_reg__
+  72:main.c        **** 	return ADCH;
+ 233               	.LM19:
+ 234 0032 85B1      		in r24,0x5
+  73:main.c        **** }
+ 236               	.LM20:
+ 237 0034 0895      		ret
+ 239               	.Lscope4:
+ 241               		.stabd	78,0,0
+ 243               	.global	readADC_thermistor
+ 245               	readADC_thermistor:
+ 246               		.stabd	46,0,0
+  74:main.c        **** uint8_t readADC_thermistor(void){
+ 248               	.LM21:
+ 249               	.LFBB5:
+ 250               	/* prologue: function */
+ 251               	/* frame size = 0 */
+ 252               	/* stack size = 0 */
+ 253               	.L__stack_usage = 0
+  75:main.c        **** 
+  76:main.c        **** 	ADCSRA = (1<<ADEN)|(1<<ADPS2)|(1<<ADPS1)|(1<<ADIE);//ADC EN, ~125 KHz ADC, ADC INT EN
+ 255               	.LM22:
+ 256 0036 8EE8      		ldi r24,lo8(-114)
+ 257 0038 86B9      		out 0x6,r24
+  77:main.c        **** 	PORTB &= ~(1<<PB4);//no pullup
+ 259               	.LM23:
+ 260 003a C498      		cbi 0x18,4
+  78:main.c        **** 	DDRB &= ~(1<<PB4);//input
+ 262               	.LM24:
+ 263 003c BC98      		cbi 0x17,4
+  79:main.c        **** 	ADMUX = (1<<MUX1)|(1<<ADLAR);//ADC pin PB2
+ 265               	.LM25:
+ 266 003e 82E2      		ldi r24,lo8(34)
+ 267 0040 87B9      		out 0x7,r24
+  80:main.c        **** 	ADCSRA |= (1<<ADSC);
+ 269               	.LM26:
+ 270 0042 369A      		sbi 0x6,6
+  81:main.c        **** 		
+  82:main.c        **** 	asm("SEI");//set up interrupts
+ 272               	.LM27:
+ 273               	/* #APP */
+ 274               	 ;  82 "main.c" 1
+ 275 0044 7894      		SEI
+ 276               	 ;  0 "" 2
+  83:main.c        **** 	MCUCR = (1<<SE);//sleep enable
+ 278               	.LM28:
+ 279               	/* #NOAPP */
+ 280 0046 80E2      		ldi r24,lo8(32)
+ 281 0048 85BF      		out 0x35,r24
+  84:main.c        **** 	asm("sleep");//sleep
+ 283               	.LM29:
+ 284               	/* #APP */
+ 285               	 ;  84 "main.c" 1
+ 286 004a 8895      		sleep
+ 287               	 ;  0 "" 2
+  85:main.c        **** 
+  86:main.c        **** 	DDRB |= (1<<PB4);
+ 289               	.LM30:
+ 290               	/* #NOAPP */
+ 291 004c BC9A      		sbi 0x17,4
+  87:main.c        **** 	ADCSRA = 0;
+ 293               	.LM31:
+ 294 004e 16B8      		out 0x6,__zero_reg__
+  88:main.c        **** 	return ADCH;
+ 296               	.LM32:
+ 297 0050 85B1      		in r24,0x5
+  89:main.c        **** }
+ 299               	.LM33:
+ 300 0052 0895      		ret
+ 302               	.Lscope5:
+ 304               		.stabd	78,0,0
+ 307               	.global	send
+ 309               	send:
+ 310               		.stabd	46,0,0
+  90:main.c        **** void send(uint8_t input){//transmit byte to the shift register
+ 312               	.LM34:
+ 313               	.LFBB6:
+ 314               	/* prologue: function */
+ 315               	/* frame size = 0 */
+ 316               	/* stack size = 0 */
+ 317               	.L__stack_usage = 0
+ 319               	.LM35:
+ 320 0054 98E0      		ldi r25,lo8(8)
+ 321               	.L9:
+ 322               	.LBB2:
+  91:main.c        **** 	for(uint8_t i=0;i<8;i++){//run 8 times
+  92:main.c        **** 		if((input & 0x01)== 0x01)//if 1, set output to 1
+ 324               	.LM36:
+ 325 0056 80FF      		sbrs r24,0
+ 326 0058 00C0      		rjmp .L7
+  93:main.c        **** 			PORTB |= (1<<PB4);//data set
+ 328               	.LM37:
+ 329 005a C49A      		sbi 0x18,4
+ 330 005c 00C0      		rjmp .L8
+ 331               	.L7:
+  94:main.c        **** 		else
+  95:main.c        **** 			PORTB &= ~(1<<PB4);//else 0
+ 333               	.LM38:
+ 334 005e C498      		cbi 0x18,4
+ 335               	.L8:
+  96:main.c        **** 		input = input>>1;//shift over 1
+ 337               	.LM39:
+ 338 0060 8695      		lsr r24
+  97:main.c        **** 		PORTB |= (1<<PB3);//turn on clock
+ 340               	.LM40:
+ 341 0062 C39A      		sbi 0x18,3
+  98:main.c        **** 		PORTB &= ~(1<<PB3);//turn off clock
+ 343               	.LM41:
+ 344 0064 C398      		cbi 0x18,3
+ 345 0066 9150      		subi r25,lo8(-(-1))
+  91:main.c        **** 		if((input & 0x01)== 0x01)//if 1, set output to 1
+ 347               	.LM42:
+ 348 0068 01F4      		brne .L9
+ 349               	/* epilogue start */
+ 350               	.LBE2:
+  99:main.c        **** 	}
+ 100:main.c        **** }	
+ 352               	.LM43:
+ 353 006a 0895      		ret
+ 355               	.Lscope6:
+ 357               		.stabd	78,0,0
+ 360               	.global	PID_Error_PWM
+ 362               	PID_Error_PWM:
+ 363               		.stabd	46,0,0
+ 101:main.c        **** 
+ 102:main.c        **** 
+ 103:main.c        **** uint8_t PID_Error_PWM(int8_t error[2]){
+ 365               	.LM44:
+ 366               	.LFBB7:
+ 367               	/* prologue: function */
+ 368               	/* frame size = 0 */
+ 369               	/* stack size = 0 */
+ 370               	.L__stack_usage = 0
+ 371 006c FC01      		movw r30,r24
+ 104:main.c        **** 	uint16_t total;//made 16 bit so there's no overflows
+ 105:main.c        **** 	
+ 106:main.c        **** 	p =  kp*error[0];//P term
+ 373               	.LM45:
+ 374 006e 2081      		ld r18,Z
+ 375 0070 022E      		mov __tmp_reg__,r18
+ 376 0072 000C      		lsl r0
+ 377 0074 330B      		sbc r19,r19
+ 378 0076 C901      		movw r24,r18
+ 379 0078 880F      		lsl r24
+ 380 007a 991F      		rol r25
+ 381 007c 880F      		lsl r24
+ 382 007e 991F      		rol r25
+ 383 0080 280F      		add r18,r24
+ 384 0082 391F      		adc r19,r25
+ 385 0084 A901      		movw r20,r18
+ 386 0086 440F      		lsl r20
+ 387 0088 551F      		rol r21
+ 388 008a 440F      		lsl r20
+ 389 008c 551F      		rol r21
+ 390 008e 240F      		add r18,r20
+ 391 0090 351F      		adc r19,r21
+ 392 0092 220F      		lsl r18
+ 393 0094 331F      		rol r19
+ 394 0096 C901      		movw r24,r18
+ 395 0098 3093 0000 		sts p+1,r19
+ 396 009c 2093 0000 		sts p,r18
+ 107:main.c        **** 	if(p >= 255)
+ 398               	.LM46:
+ 399 00a0 2F3F      		cpi r18,-1
+ 400 00a2 3105      		cpc r19,__zero_reg__
+ 401 00a4 04F0      		brlt .L12
+ 108:main.c        **** 		p = 255;//no overflows or underflows
+ 403               	.LM47:
+ 404 00a6 8FEF      		ldi r24,lo8(-1)
+ 405 00a8 90E0      		ldi r25,0
+ 406 00aa 9093 0000 		sts p+1,r25
+ 407 00ae 8093 0000 		sts p,r24
+ 408 00b2 00C0      		rjmp .L13
+ 409               	.L12:
+ 109:main.c        **** 	if(p < 0)
+ 411               	.LM48:
+ 412 00b4 9923      		tst r25
+ 413 00b6 04F4      		brge .L13
+ 110:main.c        **** 		p=0;
+ 415               	.LM49:
+ 416 00b8 1092 0000 		sts p+1,__zero_reg__
+ 417 00bc 1092 0000 		sts p,__zero_reg__
+ 418               	.L13:
+ 111:main.c        **** 		
+ 112:main.c        **** 	i = i + ki*error[0];//I term
+ 420               	.LM50:
+ 421 00c0 2081      		ld r18,Z
+ 422 00c2 8091 0000 		lds r24,i
+ 423 00c6 9091 0000 		lds r25,i+1
+ 424 00ca 820F      		add r24,r18
+ 425 00cc 911D      		adc r25,__zero_reg__
+ 426 00ce 27FD      		sbrc r18,7
+ 427 00d0 9A95      		dec r25
+ 113:main.c        **** 	if(i >= 200)
+ 429               	.LM51:
+ 430 00d2 883C      		cpi r24,-56
+ 431 00d4 9105      		cpc r25,__zero_reg__
+ 432 00d6 04F0      		brlt .L14
+ 114:main.c        **** 		i = 150;//no overflows or underflows
+ 434               	.LM52:
+ 435 00d8 86E9      		ldi r24,lo8(-106)
+ 436 00da 90E0      		ldi r25,0
+ 437 00dc 9093 0000 		sts i+1,r25
+ 438 00e0 8093 0000 		sts i,r24
+ 439 00e4 00C0      		rjmp .L15
+ 440               	.L14:
+ 115:main.c        **** 	else if(i < 0)
+ 442               	.LM53:
+ 443 00e6 9923      		tst r25
+ 444 00e8 04F0      		brlt .L16
+ 112:main.c        **** 	if(i >= 200)
+ 446               	.LM54:
+ 447 00ea 9093 0000 		sts i+1,r25
+ 448 00ee 8093 0000 		sts i,r24
+ 449 00f2 00C0      		rjmp .L15
+ 450               	.L16:
+ 116:main.c        **** 		i=0;
+ 452               	.LM55:
+ 453 00f4 1092 0000 		sts i+1,__zero_reg__
+ 454 00f8 1092 0000 		sts i,__zero_reg__
+ 455               	.L15:
+ 117:main.c        **** 		
+ 118:main.c        **** 	d =  kd * (error[1]-error[0]);//d term
+ 457               	.LM56:
+ 458 00fc 2181      		ldd r18,Z+1
+ 459 00fe 022E      		mov __tmp_reg__,r18
+ 460 0100 000C      		lsl r0
+ 461 0102 330B      		sbc r19,r19
+ 462 0104 8081      		ld r24,Z
+ 463 0106 A901      		movw r20,r18
+ 464 0108 481B      		sub r20,r24
+ 465 010a 5109      		sbc r21,__zero_reg__
+ 466 010c 87FD      		sbrc r24,7
+ 467 010e 5395      		inc r21
+ 468 0110 9A01      		movw r18,r20
+ 469 0112 2295      		swap r18
+ 470 0114 3295      		swap r19
+ 471 0116 307F      		andi r19,0xf0
+ 472 0118 3227      		eor r19,r18
+ 473 011a 207F      		andi r18,0xf0
+ 474 011c 3227      		eor r19,r18
+ 475 011e 241B      		sub r18,r20
+ 476 0120 350B      		sbc r19,r21
+ 477 0122 220F      		lsl r18
+ 478 0124 331F      		rol r19
+ 479 0126 3093 0000 		sts d+1,r19
+ 480 012a 2093 0000 		sts d,r18
+ 119:main.c        **** 	if(p+i == 0)
+ 482               	.LM57:
+ 483 012e 4091 0000 		lds r20,p
+ 484 0132 5091 0000 		lds r21,p+1
+ 485 0136 8091 0000 		lds r24,i
+ 486 013a 9091 0000 		lds r25,i+1
+ 487 013e 840F      		add r24,r20
+ 488 0140 951F      		adc r25,r21
+ 489 0142 0097      		sbiw r24,0
+ 490 0144 01F4      		brne .L17
+ 120:main.c        **** 		d=0;
+ 492               	.LM58:
+ 493 0146 1092 0000 		sts d+1,__zero_reg__
+ 494 014a 1092 0000 		sts d,__zero_reg__
+ 495 014e 0895      		ret
+ 496               	.L17:
+ 121:main.c        **** 	total = p+i+d;
+ 498               	.LM59:
+ 499 0150 820F      		add r24,r18
+ 500 0152 931F      		adc r25,r19
+ 122:main.c        **** 	if(total >= 255)//no overflows
+ 502               	.LM60:
+ 503 0154 8F3F      		cpi r24,-1
+ 504 0156 9105      		cpc r25,__zero_reg__
+ 505 0158 00F0      		brlo .L19
+ 123:main.c        **** 		return 255;
+ 507               	.LM61:
+ 508 015a 8FEF      		ldi r24,lo8(-1)
+ 509               	.L19:
+ 124:main.c        **** 	return (uint8_t)total;//mask top 8 bits
+ 125:main.c        **** }
+ 511               	.LM62:
+ 512 015c 0895      		ret
+ 514               	.Lscope7:
+ 516               		.stabd	78,0,0
+ 519               	.global	numtodisp
+ 521               	numtodisp:
+ 522               		.stabd	46,0,0
+ 126:main.c        **** //0 = 0xFC	5 = 0xB6	
+ 127:main.c        **** //1 = 0x60	6 = 0xBE
+ 128:main.c        **** //2 = 0xDA	7 = 0xE0
+ 129:main.c        **** //3 = 0xF2	8 = 0xFE
+ 130:main.c        **** //4 = 0x66	9 = 0xF6
+ 131:main.c        **** uint8_t numtodisp(uint8_t disp){
+ 524               	.LM63:
+ 525               	.LFBB8:
+ 526               	/* prologue: function */
+ 527               	/* frame size = 0 */
+ 528               	/* stack size = 0 */
+ 529               	.L__stack_usage = 0
+ 132:main.c        **** 	if(disp == 1)return 0x60;
+ 531               	.LM64:
+ 532 015e 8130      		cpi r24,lo8(1)
+ 533 0160 01F0      		breq .L23
+ 133:main.c        **** 	else if(disp == 2)return 0xDA;
+ 535               	.LM65:
+ 536 0162 8230      		cpi r24,lo8(2)
+ 537 0164 01F0      		breq .L24
+ 134:main.c        **** 	else if(disp == 3)return 0xF2;
+ 539               	.LM66:
+ 540 0166 8330      		cpi r24,lo8(3)
+ 541 0168 01F0      		breq .L25
+ 135:main.c        **** 	else if(disp == 4)return 0x66;
+ 543               	.LM67:
+ 544 016a 8430      		cpi r24,lo8(4)
+ 545 016c 01F0      		breq .L26
+ 136:main.c        **** 	else if(disp == 5)return 0xB6;
+ 547               	.LM68:
+ 548 016e 8530      		cpi r24,lo8(5)
+ 549 0170 01F0      		breq .L27
+ 137:main.c        **** 	else if(disp == 6)return 0xBE;
+ 551               	.LM69:
+ 552 0172 8630      		cpi r24,lo8(6)
+ 553 0174 01F0      		breq .L28
+ 138:main.c        **** 	else if(disp == 7)return 0xE0;
+ 555               	.LM70:
+ 556 0176 8730      		cpi r24,lo8(7)
+ 557 0178 01F0      		breq .L29
+ 139:main.c        **** 	else if(disp == 8)return 0xFE;
+ 559               	.LM71:
+ 560 017a 8830      		cpi r24,lo8(8)
+ 561 017c 01F0      		breq .L30
+ 140:main.c        **** 	else if(disp == 9)return 0xF6;
+ 563               	.LM72:
+ 564 017e 8930      		cpi r24,lo8(9)
+ 565 0180 01F0      		breq .L31
+ 141:main.c        **** 	return 0xFC;
+ 567               	.LM73:
+ 568 0182 8CEF      		ldi r24,lo8(-4)
+ 569 0184 0895      		ret
+ 570               	.L23:
+ 132:main.c        **** 	else if(disp == 2)return 0xDA;
+ 572               	.LM74:
+ 573 0186 80E6      		ldi r24,lo8(96)
+ 574 0188 0895      		ret
+ 575               	.L24:
+ 133:main.c        **** 	else if(disp == 3)return 0xF2;
+ 577               	.LM75:
+ 578 018a 8AED      		ldi r24,lo8(-38)
+ 579 018c 0895      		ret
+ 580               	.L25:
+ 134:main.c        **** 	else if(disp == 4)return 0x66;
+ 582               	.LM76:
+ 583 018e 82EF      		ldi r24,lo8(-14)
+ 584 0190 0895      		ret
+ 585               	.L26:
+ 135:main.c        **** 	else if(disp == 5)return 0xB6;
+ 587               	.LM77:
+ 588 0192 86E6      		ldi r24,lo8(102)
+ 589 0194 0895      		ret
+ 590               	.L27:
+ 136:main.c        **** 	else if(disp == 6)return 0xBE;
+ 592               	.LM78:
+ 593 0196 86EB      		ldi r24,lo8(-74)
+ 594 0198 0895      		ret
+ 595               	.L28:
+ 137:main.c        **** 	else if(disp == 7)return 0xE0;
+ 597               	.LM79:
+ 598 019a 8EEB      		ldi r24,lo8(-66)
+ 599 019c 0895      		ret
+ 600               	.L29:
+ 138:main.c        **** 	else if(disp == 8)return 0xFE;
+ 602               	.LM80:
+ 603 019e 80EE      		ldi r24,lo8(-32)
+ 604 01a0 0895      		ret
+ 605               	.L30:
+ 139:main.c        **** 	else if(disp == 9)return 0xF6;
+ 607               	.LM81:
+ 608 01a2 8EEF      		ldi r24,lo8(-2)
+ 609 01a4 0895      		ret
+ 610               	.L31:
+ 140:main.c        **** 	return 0xFC;
+ 612               	.LM82:
+ 613 01a6 86EF      		ldi r24,lo8(-10)
+ 142:main.c        **** }
+ 615               	.LM83:
+ 616 01a8 0895      		ret
+ 618               	.Lscope8:
+ 620               		.stabd	78,0,0
+ 624               	.global	temp_to_disp
+ 626               	temp_to_disp:
+ 627               		.stabd	46,0,0
+ 143:main.c        **** void temp_to_disp(uint8_t temp,uint8_t bit){//bit=0,2
+ 629               	.LM84:
+ 630               	.LFBB9:
+ 631 01aa 0F93      		push r16
+ 632 01ac 1F93      		push r17
+ 633 01ae CF93      		push r28
+ 634               	/* prologue: function */
+ 635               	/* frame size = 0 */
+ 636               	/* stack size = 3 */
+ 637               	.L__stack_usage = 3
+ 638 01b0 C82F      		mov r28,r24
+ 144:main.c        **** 	
+ 145:main.c        **** 	uint8_t counter = 0;
+ 146:main.c        **** 	while(temp >= 10){
+ 640               	.LM85:
+ 641 01b2 8A30      		cpi r24,lo8(10)
+ 642 01b4 00F0      		brlo .L35
+ 643 01b6 80E0      		ldi r24,0
+ 644               	.L34:
+ 147:main.c        **** 		counter++;
+ 646               	.LM86:
+ 647 01b8 8F5F      		subi r24,lo8(-(1))
+ 148:main.c        **** 		temp-=10;
+ 649               	.LM87:
+ 650 01ba CA50      		subi r28,lo8(-(-10))
+ 146:main.c        **** 		counter++;
+ 652               	.LM88:
+ 653 01bc CA30      		cpi r28,lo8(10)
+ 654 01be 00F4      		brsh .L34
+ 655 01c0 00C0      		rjmp .L33
+ 656               	.L35:
+ 145:main.c        **** 	while(temp >= 10){
+ 658               	.LM89:
+ 659 01c2 80E0      		ldi r24,0
+ 660               	.L33:
+ 149:main.c        **** 	}		
+ 150:main.c        **** 	receivedchars[bit] = numtodisp(counter);
+ 662               	.LM90:
+ 663 01c4 062F      		mov r16,r22
+ 664 01c6 10E0      		ldi r17,0
+ 665 01c8 00D0      		rcall numtodisp
+ 666 01ca 0050      		subi r16,lo8(-(receivedchars))
+ 667 01cc 1040      		sbci r17,hi8(-(receivedchars))
+ 668 01ce F801      		movw r30,r16
+ 669 01d0 8083      		st Z,r24
+ 151:main.c        **** 	receivedchars[bit+1] = numtodisp(temp);
+ 671               	.LM91:
+ 672 01d2 8C2F      		mov r24,r28
+ 673 01d4 00D0      		rcall numtodisp
+ 674 01d6 F801      		movw r30,r16
+ 675 01d8 8183      		std Z+1,r24
+ 676               	/* epilogue start */
+ 152:main.c        **** 	
+ 153:main.c        **** 
+ 154:main.c        **** }
+ 678               	.LM92:
+ 679 01da CF91      		pop r28
+ 680 01dc 1F91      		pop r17
+ 681 01de 0F91      		pop r16
+ 682 01e0 0895      		ret
+ 687               	.Lscope9:
+ 689               		.stabd	78,0,0
+ 692               	.global	ADCtoTEMP
+ 694               	ADCtoTEMP:
+ 695               		.stabd	46,0,0
+ 155:main.c        **** 
+ 156:main.c        **** 
+ 157:main.c        **** uint8_t ADCtoTEMP(uint8_t ADCval){
+ 697               	.LM93:
+ 698               	.LFBB10:
+ 699               	/* prologue: function */
+ 700               	/* frame size = 0 */
+ 701               	/* stack size = 0 */
+ 702               	.L__stack_usage = 0
+ 158:main.c        **** 		return (uint8_t)(((uint16_t)105*ADCval)/256 - 17);//19 at end//let the comiler decide on whether 
+ 704               	.LM94:
+ 705 01e2 282F      		mov r18,r24
+ 706 01e4 30E0      		ldi r19,0
+ 707 01e6 C901      		movw r24,r18
+ 708 01e8 880F      		lsl r24
+ 709 01ea 991F      		rol r25
+ 710 01ec 880F      		lsl r24
+ 711 01ee 991F      		rol r25
+ 712 01f0 880F      		lsl r24
+ 713 01f2 991F      		rol r25
+ 714 01f4 821B      		sub r24,r18
+ 715 01f6 930B      		sbc r25,r19
+ 716 01f8 9C01      		movw r18,r24
+ 717 01fa 2295      		swap r18
+ 718 01fc 3295      		swap r19
+ 719 01fe 307F      		andi r19,0xf0
+ 720 0200 3227      		eor r19,r18
+ 721 0202 207F      		andi r18,0xf0
+ 722 0204 3227      		eor r19,r18
+ 723 0206 A901      		movw r20,r18
+ 724 0208 481B      		sub r20,r24
+ 725 020a 590B      		sbc r21,r25
+ 726 020c CA01      		movw r24,r20
+ 159:main.c        **** }
+ 728               	.LM95:
+ 729 020e 8FEE      		ldi r24,lo8(-17)
+ 730 0210 890F      		add r24,r25
+ 731 0212 0895      		ret
+ 733               	.Lscope10:
+ 735               		.stabd	78,0,0
+ 737               	.global	__vector_3
+ 739               	__vector_3:
+ 740               		.stabd	46,0,0
+ 160:main.c        **** ISR(TIM0_OVF_vect){//585.9375 hz
+ 742               	.LM96:
+ 743               	.LFBB11:
+ 744 0214 1F92      		push r1
+ 745 0216 0F92      		push r0
+ 746 0218 0FB6      		in r0,__SREG__
+ 747 021a 0F92      		push r0
+ 748 021c 1124      		clr __zero_reg__
+ 749 021e 2F93      		push r18
+ 750 0220 3F93      		push r19
+ 751 0222 4F93      		push r20
+ 752 0224 5F93      		push r21
+ 753 0226 6F93      		push r22
+ 754 0228 7F93      		push r23
+ 755 022a 8F93      		push r24
+ 756 022c 9F93      		push r25
+ 757 022e AF93      		push r26
+ 758 0230 BF93      		push r27
+ 759 0232 EF93      		push r30
+ 760 0234 FF93      		push r31
+ 761               	/* prologue: Signal */
+ 762               	/* frame size = 0 */
+ 763               	/* stack size = 15 */
+ 764               	.L__stack_usage = 15
+ 161:main.c        **** 	if(ovf_counter >= 117){//5 hz
+ 766               	.LM97:
+ 767 0236 8091 0000 		lds r24,ovf_counter
+ 768 023a 8537      		cpi r24,lo8(117)
+ 769 023c 00F0      		brlo .L39
+ 162:main.c        **** 		ovf_flag = 1;
+ 771               	.LM98:
+ 772 023e 81E0      		ldi r24,lo8(1)
+ 773 0240 8093 0000 		sts ovf_flag,r24
+ 163:main.c        **** 		ovf_counter = 0;
+ 775               	.LM99:
+ 776 0244 1092 0000 		sts ovf_counter,__zero_reg__
+ 777 0248 00C0      		rjmp .L40
+ 778               	.L39:
+ 164:main.c        **** 	}else
+ 165:main.c        **** 		ovf_counter++;
+ 780               	.LM100:
+ 781 024a 8F5F      		subi r24,lo8(-(1))
+ 782 024c 8093 0000 		sts ovf_counter,r24
+ 783               	.L40:
+ 166:main.c        **** 	if(sregctr == 0x80){//fancy thing done here, sregctr is the second thing sent. It acts as the cath
+ 785               	.LM101:
+ 786 0250 8091 0000 		lds r24,sregctr
+ 787 0254 8038      		cpi r24,lo8(-128)
+ 788 0256 01F4      		brne .L41
+ 167:main.c        **** 		send( receivedchars[2]);
+ 790               	.LM102:
+ 791 0258 8091 0000 		lds r24,receivedchars+2
+ 792 025c 00D0      		rcall send
+ 793 025e 00C0      		rjmp .L42
+ 794               	.L41:
+ 168:main.c        **** 	}else if(sregctr == 0x40){
+ 796               	.LM103:
+ 797 0260 8034      		cpi r24,lo8(64)
+ 798 0262 01F4      		brne .L43
+ 169:main.c        **** 		send( receivedchars[3]);
+ 800               	.LM104:
+ 801 0264 8091 0000 		lds r24,receivedchars+3
+ 802 0268 00D0      		rcall send
+ 803 026a 00C0      		rjmp .L42
+ 804               	.L43:
+ 170:main.c        **** 	}else if(sregctr == 0x20){
+ 806               	.LM105:
+ 807 026c 8032      		cpi r24,lo8(32)
+ 808 026e 01F4      		brne .L44
+ 171:main.c        **** 		send( receivedchars[0]);
+ 810               	.LM106:
+ 811 0270 8091 0000 		lds r24,receivedchars
+ 812 0274 00D0      		rcall send
+ 813 0276 00C0      		rjmp .L42
+ 814               	.L44:
+ 172:main.c        **** 	}else if(sregctr == 0x10){
+ 816               	.LM107:
+ 817 0278 8031      		cpi r24,lo8(16)
+ 818 027a 01F4      		brne .L45
+ 173:main.c        **** 		send( receivedchars[1]);
+ 820               	.LM108:
+ 821 027c 8091 0000 		lds r24,receivedchars+1
+ 822 0280 00D0      		rcall send
+ 823 0282 00C0      		rjmp .L42
+ 824               	.L45:
+ 174:main.c        **** 	}else
+ 175:main.c        **** 		sregctr = 0x08;
+ 826               	.LM109:
+ 827 0284 88E0      		ldi r24,lo8(8)
+ 828 0286 8093 0000 		sts sregctr,r24
+ 829               	.L42:
+ 176:main.c        **** 	send(~sregctr);//send the inverse of sregctr
+ 831               	.LM110:
+ 832 028a 8091 0000 		lds r24,sregctr
+ 833 028e 8095      		com r24
+ 834 0290 00D0      		rcall send
+ 177:main.c        **** 	latch();//latch the shift register, displaying the values.
+ 836               	.LM111:
+ 837 0292 00D0      		rcall latch
+ 178:main.c        **** 	if(sregctr == 0x80)//if it is on the 4th digit, set it as just before the 1st digit
+ 839               	.LM112:
+ 840 0294 8091 0000 		lds r24,sregctr
+ 841 0298 8038      		cpi r24,lo8(-128)
+ 842 029a 01F4      		brne .L46
+ 179:main.c        **** 		sregctr = 0x08;
+ 844               	.LM113:
+ 845 029c 88E0      		ldi r24,lo8(8)
+ 846 029e 8093 0000 		sts sregctr,r24
+ 847               	.L46:
+ 180:main.c        **** 
+ 181:main.c        **** 		sregctr = sregctr<<1;//shift over sregctr
+ 849               	.LM114:
+ 850 02a2 8091 0000 		lds r24,sregctr
+ 851 02a6 880F      		lsl r24
+ 852 02a8 8093 0000 		sts sregctr,r24
+ 853               	/* epilogue start */
+ 182:main.c        **** }
+ 855               	.LM115:
+ 856 02ac FF91      		pop r31
+ 857 02ae EF91      		pop r30
+ 858 02b0 BF91      		pop r27
+ 859 02b2 AF91      		pop r26
+ 860 02b4 9F91      		pop r25
+ 861 02b6 8F91      		pop r24
+ 862 02b8 7F91      		pop r23
+ 863 02ba 6F91      		pop r22
+ 864 02bc 5F91      		pop r21
+ 865 02be 4F91      		pop r20
+ 866 02c0 3F91      		pop r19
+ 867 02c2 2F91      		pop r18
+ 868 02c4 0F90      		pop r0
+ 869 02c6 0FBE      		out __SREG__,r0
+ 870 02c8 0F90      		pop r0
+ 871 02ca 1F90      		pop r1
+ 872 02cc 1895      		reti
+ 874               	.Lscope11:
+ 876               		.stabd	78,0,0
+ 878               	.global	__vector_9
+ 880               	__vector_9:
+ 881               		.stabd	46,0,0
+ 183:main.c        **** 
+ 184:main.c        **** ISR(ADC_vect){}
+ 883               	.LM116:
+ 884               	.LFBB12:
+ 885 02ce 1F92      		push r1
+ 886 02d0 0F92      		push r0
+ 887 02d2 0FB6      		in r0,__SREG__
+ 888 02d4 0F92      		push r0
+ 889 02d6 1124      		clr __zero_reg__
+ 890               	/* prologue: Signal */
+ 891               	/* frame size = 0 */
+ 892               	/* stack size = 3 */
+ 893               	.L__stack_usage = 3
+ 894               	/* epilogue start */
+ 896               	.LM117:
+ 897 02d8 0F90      		pop r0
+ 898 02da 0FBE      		out __SREG__,r0
+ 899 02dc 0F90      		pop r0
+ 900 02de 1F90      		pop r1
+ 901 02e0 1895      		reti
+ 903               	.Lscope12:
+ 905               		.stabd	78,0,0
+ 908               	.global	PottoTemp
+ 910               	PottoTemp:
+ 911               		.stabd	46,0,0
+ 185:main.c        **** uint8_t PottoTemp(uint8_t pot){
+ 913               	.LM118:
+ 914               	.LFBB13:
+ 915               	/* prologue: function */
+ 916               	/* frame size = 0 */
+ 917               	/* stack size = 0 */
+ 918               	.L__stack_usage = 0
+ 186:main.c        **** 	return pot>>2;//0 to 65c, quite linear
+ 187:main.c        **** }
+ 920               	.LM119:
+ 921 02e2 8695      		lsr r24
+ 922 02e4 8695      		lsr r24
+ 923 02e6 0895      		ret
+ 925               	.Lscope13:
+ 927               		.stabd	78,0,0
+ 929               	.global	main
+ 931               	main:
+ 932               		.stabd	46,0,0
+ 188:main.c        **** 
+ 189:main.c        **** 
+ 190:main.c        **** 
+ 191:main.c        **** int main(void){
+ 934               	.LM120:
+ 935               	.LFBB14:
+ 936 02e8 CF93      		push r28
+ 937 02ea DF93      		push r29
+ 938 02ec 00D0      		rcall .
+ 939 02ee CDB7      		in r28,__SP_L__
+ 940 02f0 DD27      		clr r29
+ 941               	/* prologue: function */
+ 942               	/* frame size = 2 */
+ 943               	/* stack size = 4 */
+ 944               	.L__stack_usage = 4
+ 192:main.c        **** 
+ 193:main.c        **** 	DDRB = 0xFF;
+ 946               	.LM121:
+ 947 02f2 8FEF      		ldi r24,lo8(-1)
+ 948 02f4 87BB      		out 0x17,r24
+ 194:main.c        **** 
+ 195:main.c        **** 	Timer_Init();//init timer
+ 950               	.LM122:
+ 951 02f6 00D0      		rcall Timer_Init
+ 952               	.LBB9:
+ 953               	.LBB10:
+  62:main.c        **** }
+ 955               	.LM123:
+ 956 02f8 8BEF      		ldi r24,lo8(-5)
+ 957 02fa 87BB      		out 0x17,r24
+ 958               	.LBE10:
+ 959               	.LBE9:
+ 196:main.c        **** 
+ 197:main.c        **** 	IO_init();
+ 198:main.c        **** 	uint8_t realTemp[]={0,0},goalTemp_filtered = 0,realTemp_ADC = 0,goalTemp_ADC = 0,goalTemp[] = {0,0
+ 199:main.c        **** 	int8_t error[] = {0,0};
+ 961               	.LM124:
+ 962 02fc 1982      		std Y+1,__zero_reg__
+ 963 02fe 1A82      		std Y+2,__zero_reg__
+ 198:main.c        **** 	int8_t error[] = {0,0};
+ 965               	.LM125:
+ 966 0300 10E0      		ldi r17,0
+ 967 0302 B12C      		mov r11,__zero_reg__
+ 200:main.c        **** 	while(1){
+ 201:main.c        **** 		asm("SEI");//set up interrupts
+ 202:main.c        **** 		MCUCR = (1<<SE);//sleep enable
+ 969               	.LM126:
+ 970 0304 6894      		set
+ 971 0306 CC24      		clr r12
+ 972 0308 C5F8      		bld r12,5
+ 973 030a 00C0      		rjmp .L50
+ 974               	.L51:
+ 975 030c BA2C      		mov r11,r10
+ 976 030e 1D2D      		mov r17,r13
+ 977               	.L50:
+ 201:main.c        **** 		MCUCR = (1<<SE);//sleep enable
+ 979               	.LM127:
+ 980               	/* #APP */
+ 981               	 ;  201 "main.c" 1
+ 982 0310 7894      		SEI
+ 983               	 ;  0 "" 2
+ 985               	.LM128:
+ 986               	/* #NOAPP */
+ 987 0312 C5BE      		out 0x35,r12
+ 203:main.c        **** 		asm("sleep");//sleep
+ 989               	.LM129:
+ 990               	/* #APP */
+ 991               	 ;  203 "main.c" 1
+ 992 0314 8895      		sleep
+ 993               	 ;  0 "" 2
+ 204:main.c        **** 		
+ 205:main.c        **** 		goalTemp_ADC = readADC_potentiometer();
+ 995               	.LM130:
+ 996               	/* #NOAPP */
+ 997 0316 00D0      		rcall readADC_potentiometer
+ 998 0318 D82E      		mov r13,r24
+ 206:main.c        **** 		realTemp_ADC = readADC_thermistor();
+ 1000               	.LM131:
+ 1001 031a 00D0      		rcall readADC_thermistor
+ 1002               	.LBB11:
+ 1003               	.LBB12:
+ 186:main.c        **** }
+ 1005               	.LM132:
+ 1006 031c D694      		lsr r13
+ 1007 031e D694      		lsr r13
+ 1008               	.LBE12:
+ 1009               	.LBE11:
+ 207:main.c        **** 		goalTemp[0] = goalTemp[1];
+ 208:main.c        **** 		goalTemp[1] = PottoTemp(goalTemp_ADC);
+ 209:main.c        **** 		goalTemp_filtered = (goalTemp[0] + goalTemp[1])>>1; 
+ 1011               	.LM133:
+ 1012 0320 ED2C      		mov r14,r13
+ 1013 0322 F12C      		mov r15,__zero_reg__
+ 1014 0324 E10E      		add r14,r17
+ 1015 0326 F11C      		adc r15,__zero_reg__
+ 1016 0328 F594      		asr r15
+ 1017 032a E794      		ror r14
+ 1018               	.LBB13:
+ 1019               	.LBB14:
+ 158:main.c        **** }
+ 1021               	.LM134:
+ 1022 032c 282F      		mov r18,r24
+ 1023 032e 30E0      		ldi r19,0
+ 1024 0330 C901      		movw r24,r18
+ 1025 0332 880F      		lsl r24
+ 1026 0334 991F      		rol r25
+ 1027 0336 880F      		lsl r24
+ 1028 0338 991F      		rol r25
+ 1029 033a 880F      		lsl r24
+ 1030 033c 991F      		rol r25
+ 1031 033e 821B      		sub r24,r18
+ 1032 0340 930B      		sbc r25,r19
+ 1033 0342 9C01      		movw r18,r24
+ 1034 0344 2295      		swap r18
+ 1035 0346 3295      		swap r19
+ 1036 0348 307F      		andi r19,0xf0
+ 1037 034a 3227      		eor r19,r18
+ 1038 034c 207F      		andi r18,0xf0
+ 1039 034e 3227      		eor r19,r18
+ 1040 0350 A901      		movw r20,r18
+ 1041 0352 481B      		sub r20,r24
+ 1042 0354 590B      		sbc r21,r25
+ 1043 0356 CA01      		movw r24,r20
+ 1044 0358 0F2E      		mov __tmp_reg__,r31
+ 1045 035a FFEE      		ldi r31,lo8(-17)
+ 1046 035c AF2E      		mov r10,r31
+ 1047 035e F02D      		mov r31,__tmp_reg__
+ 1048 0360 A90E      		add r10,r25
+ 1049               	.LBE14:
+ 1050               	.LBE13:
+ 210:main.c        **** 		
+ 211:main.c        **** 		realTemp[0] = realTemp[1];
+ 212:main.c        **** 		realTemp[1] = ADCtoTEMP(realTemp_ADC);//convert to temperature
+ 213:main.c        **** 		realTemp_filtered = (realTemp[0] + realTemp[1])>>1; 
+ 1052               	.LM135:
+ 1053 0362 0A2D      		mov r16,r10
+ 1054 0364 10E0      		ldi r17,0
+ 1055 0366 0B0D      		add r16,r11
+ 1056 0368 111D      		adc r17,__zero_reg__
+ 1057 036a 1595      		asr r17
+ 1058 036c 0795      		ror r16
+ 214:main.c        **** 		temp_to_disp(goalTemp_filtered,0);
+ 1060               	.LM136:
+ 1061 036e 60E0      		ldi r22,0
+ 1062 0370 8E2D      		mov r24,r14
+ 1063 0372 00D0      		rcall temp_to_disp
+ 215:main.c        **** 		temp_to_disp(realTemp_filtered,2);
+ 1065               	.LM137:
+ 1066 0374 62E0      		ldi r22,lo8(2)
+ 1067 0376 802F      		mov r24,r16
+ 1068 0378 00D0      		rcall temp_to_disp
+ 216:main.c        **** 		
+ 217:main.c        **** 		if(ovf_flag){
+ 1070               	.LM138:
+ 1071 037a 8091 0000 		lds r24,ovf_flag
+ 1072 037e 8823      		tst r24
+ 1073 0380 01F0      		breq .L51
+ 218:main.c        **** 		ovf_flag=0;
+ 1075               	.LM139:
+ 1076 0382 1092 0000 		sts ovf_flag,__zero_reg__
+ 219:main.c        **** 		
+ 220:main.c        **** 		error[0] = realTemp_filtered - goalTemp_filtered;//save error
+ 1078               	.LM140:
+ 1079 0386 0E19      		sub r16,r14
+ 1080 0388 0983      		std Y+1,r16
+ 221:main.c        **** 		OCR0A = PID_Error_PWM(error);//convert to PWM value using PID
+ 1082               	.LM141:
+ 1083 038a CE01      		movw r24,r28
+ 1084 038c 0196      		adiw r24,1
+ 1085 038e 00D0      		rcall PID_Error_PWM
+ 1086 0390 86BF      		out 0x36,r24
+ 222:main.c        **** 		
+ 223:main.c        **** 		error[1] = error[0];
+ 1088               	.LM142:
+ 1089 0392 8981      		ldd r24,Y+1
+ 1090 0394 8A83      		std Y+2,r24
+ 1091 0396 00C0      		rjmp .L51
+ 1098               	.Lscope14:
+ 1100               		.stabd	78,0,0
+ 1101               	.global	d
+ 1102               		.section .bss
+ 1105               	d:
+ 1106 0000 0000      		.zero	2
+ 1107               	.global	i
+ 1110               	i:
+ 1111 0002 0000      		.zero	2
+ 1112               	.global	p
+ 1115               	p:
+ 1116 0004 0000      		.zero	2
+ 1117               	.global	kd
+ 1118               		.section	.rodata
+ 1121               	kd:
+ 1122 0000 1E        		.byte	30
+ 1123               	.global	ki
+ 1126               	ki:
+ 1127 0001 01        		.byte	1
+ 1128               	.global	kp
+ 1131               	kp:
+ 1132 0002 32        		.byte	50
+ 1133               	.global	receivedchars
+ 1134               		.section .bss
+ 1137               	receivedchars:
+ 1138 0006 0000 0000 		.zero	4
+ 1139               	.global	sregctr
+ 1142               	sregctr:
+ 1143 000a 00        		.zero	1
+ 1144               	.global	ovf_flag
+ 1147               	ovf_flag:
+ 1148 000b 00        		.zero	1
+ 1149               	.global	ovf_counter
+ 1152               	ovf_counter:
+ 1153 000c 00        		.zero	1
+ 1154               	.global	REF
+ 1155               		.data
+ 1158               	REF:
+ 1159 0000 1E        		.byte	30
+ 1171               		.text
+ 1173               	.Letext0:
+ 1174               		.ident	"GCC: (GNU) 5.4.0"
+ 1175               	.global __do_copy_data
+ 1176               	.global __do_clear_bss
+DEFINED SYMBOLS
+                            *ABS*:0000000000000000 main.c
+     /tmp/ccilO5Co.s:2      *ABS*:000000000000003d __SP_L__
+     /tmp/ccilO5Co.s:3      *ABS*:000000000000003f __SREG__
+     /tmp/ccilO5Co.s:4      *ABS*:0000000000000000 __tmp_reg__
+     /tmp/ccilO5Co.s:5      *ABS*:0000000000000001 __zero_reg__
+     /tmp/ccilO5Co.s:108    .text:0000000000000000 latch
+     /tmp/ccilO5Co.s:138    .text:0000000000000008 Timer_Init
+     /tmp/ccilO5Co.s:170    .text:0000000000000018 IO_init
+     /tmp/ccilO5Co.s:191    .text:000000000000001e readADC_potentiometer
+     /tmp/ccilO5Co.s:245    .text:0000000000000036 readADC_thermistor
+     /tmp/ccilO5Co.s:309    .text:0000000000000054 send
+     /tmp/ccilO5Co.s:362    .text:000000000000006c PID_Error_PWM
+     /tmp/ccilO5Co.s:1115   .bss:0000000000000004 p
+     /tmp/ccilO5Co.s:1110   .bss:0000000000000002 i
+     /tmp/ccilO5Co.s:1105   .bss:0000000000000000 d
+     /tmp/ccilO5Co.s:521    .text:000000000000015e numtodisp
+     /tmp/ccilO5Co.s:626    .text:00000000000001aa temp_to_disp
+     /tmp/ccilO5Co.s:1137   .bss:0000000000000006 receivedchars
+     /tmp/ccilO5Co.s:694    .text:00000000000001e2 ADCtoTEMP
+     /tmp/ccilO5Co.s:739    .text:0000000000000214 __vector_3
+     /tmp/ccilO5Co.s:1152   .bss:000000000000000c ovf_counter
+     /tmp/ccilO5Co.s:1147   .bss:000000000000000b ovf_flag
+     /tmp/ccilO5Co.s:1142   .bss:000000000000000a sregctr
+     /tmp/ccilO5Co.s:880    .text:00000000000002ce __vector_9
+     /tmp/ccilO5Co.s:910    .text:00000000000002e2 PottoTemp
+     /tmp/ccilO5Co.s:931    .text:00000000000002e8 main
+     /tmp/ccilO5Co.s:1121   .rodata:0000000000000000 kd
+     /tmp/ccilO5Co.s:1126   .rodata:0000000000000001 ki
+     /tmp/ccilO5Co.s:1131   .rodata:0000000000000002 kp
+     /tmp/ccilO5Co.s:1158   .data:0000000000000000 REF
+
+UNDEFINED SYMBOLS
+__do_copy_data
+__do_clear_bss
